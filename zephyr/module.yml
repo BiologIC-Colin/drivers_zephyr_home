@@ -1,0 +1,6 @@
+name: drivers_zephyr
+build:
+  cmake: .
+  kconfig: Kconfig
+  settings:
+    dts_root: .

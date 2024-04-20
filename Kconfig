@@ -1,0 +1,5 @@
+menu "BiologIC Zephyr Drivers"
+
+rsource "drivers/Kconfig"
+
+endmenu
