@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: Apache-2.0
+
+config CB_STEPPER_TMC51XX
+	bool "Activate the CB fork of the trinamic tmc51xx driver"
+	depends on DT_HAS_FLINTSTONE_TMC51XX_ENABLED
+	select CB_STEPPER_TMC_UART if $(dt_compat_on_bus,$(DT_COMPAT_FLINTSTONE_TMC51XX),uart)
+	select CB_STEPPER_TMC_SPI if $(dt_compat_on_bus,$(DT_COMPAT_FLINTSTONE_TMC51XX),spi)
+	default y
+
+if CB_STEPPER_TMC51XX
+
+config CB_STEPPER_TMC51XX_STEPPER_CTRL
+	bool "Activate the tmc51xx motion controller"
+	depends on DT_HAS_FLINTSTONE_TMC51XX_STEPPER_CTRL_ENABLED
+	depends on DT_HAS_FLINTSTONE_TMC51XX_STEPPER_DRIVER_ENABLED
+	default y
+
+config CB_STEPPER_TMC51XX_STEPPER_DRIVER
+	bool "Activate the tmc51xx stepper driver"
+	depends on DT_HAS_FLINTSTONE_TMC51XX_STEPPER_DRIVER_ENABLED
+	default y
+
+module = TMC51XX
+module-str = tmc51xx
+rsource "../Kconfig.rampgen_template"
+
+endif # CB_STEPPER_TMC51XX

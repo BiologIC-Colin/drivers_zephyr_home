@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 Jilay Sandeep Pandya
+# SPDX-License-Identifier: Apache-2.0
+
+# CB-FORK: copied from the in-tree adi,tmc51xx bindings and renamed to the
+# flintstone vendor prefix so this module's driver binds instead of the
+# upstream one. See drivers/stepper/README.md.
+compatible: "flintstone,tmc51xx-stepper-driver"
+
+include:
+  - name: stepper-driver.yaml
+  - name: adi,trinamic-stallguard.yaml
+    property-allowlist:
+      - stallguard2-threshold

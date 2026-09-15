@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+
+config CB_STEPPER_TMC_SPI
+	bool "Use the forked Trinamic stepper driver over SPI"
+	select SPI
+	help
+	  Selected automatically by CB_STEPPER_TMC51XX when the device sits on
+	  an SPI bus.
+
+config CB_STEPPER_TMC_UART
+	bool "Use the forked Trinamic stepper driver over single wire UART"
+	select UART

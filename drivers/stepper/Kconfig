@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+
+comment "CB local Trinamic stepper fork"
+
+rsource "bus/Kconfig"
+rsource "tmc51xx/Kconfig.tmc51xx"

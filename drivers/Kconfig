@@ -1,2 +1,3 @@
 rsource "sensor/Kconfig"
 rsource "pump/Kconfig"
+rsource "stepper/Kconfig"

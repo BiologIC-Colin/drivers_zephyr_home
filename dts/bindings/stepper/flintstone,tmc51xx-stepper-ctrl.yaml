@@ -1,0 +1,70 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 Jilay Sandeep Pandya
+# SPDX-License-Identifier: Apache-2.0
+
+# CB-FORK: copied from the in-tree adi,tmc51xx bindings and renamed to the
+# flintstone vendor prefix so this module's driver binds instead of the
+# upstream one. See drivers/stepper/README.md.
+compatible: "flintstone,tmc51xx-stepper-ctrl"
+
+properties:
+  stop-l-enable:
+    type: boolean
+    description: |
+      SW_MODE stop_l_enable. Stop the motor automatically while the left
+      reference switch input (REFL) is active.
+      Note the motor restarts if the switch is released again, so firmware
+      should stop the ramp generator when it sees the end-stop event.
+
+  stop-r-enable:
+    type: boolean
+    description: |
+      SW_MODE stop_r_enable. As above for the right reference switch (REFR).
+
+  pol-stop-l:
+    type: boolean
+    description: |
+      SW_MODE pol_stop_l. Invert the left reference switch input, so a LOW
+      level on REFL stops the motor. Set this for switches that pull the
+      input down when triggered, which is the usual arrangement with a
+      pull-up fitted.
+
+  pol-stop-r:
+    type: boolean
+    description: |
+      SW_MODE pol_stop_r. As above for the right reference switch (REFR).
+
+  swap-lr:
+    type: boolean
+    description: |
+      SW_MODE swap_lr. Swap the REFL and REFR inputs.
+
+  en-softstop:
+    type: boolean
+    description: |
+      SW_MODE en_softstop. Stop with a deceleration ramp instead of an
+      immediate hard stop when a reference switch triggers.
+
+include:
+  - name: adi,trinamic-stallguard.yaml
+    property-allowlist:
+      - activate-stallguard2
+      - stallguard-threshold-velocity
+      - stallguard-velocity-check-interval-ms
+  - name: adi,trinamic-ramp-generator.yaml
+    property-allowlist:
+      - vstart
+      - a1
+      - v1
+      - amax
+      - vmax
+      - dmax
+      - d1
+      - vstop
+      - tzerowait
+      - thigh
+      - tcoolthrs
+      - tpwmthrs
+      - tpowerdown
+      - ihold
+      - irun
+      - iholddelay
