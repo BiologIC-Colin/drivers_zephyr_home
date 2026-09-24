@@ -65,6 +65,26 @@ extern "C" {
 int tmc51xx_stepper_ctrl_read_ramp_stat(const struct device *dev, uint32_t *ramp_stat);
 
 /**
+ * @brief Read DRV_STATUS - open load, short, over temperature, standstill
+ *
+ * The one register that says why a motor with an enabled driver is producing no
+ * torque. ola/olb (bits 29/30) mean the coil is not connected.
+ */
+int tmc51xx_stepper_ctrl_read_drv_status(const struct device *dev, uint32_t *drv_status);
+
+/**
+ * @brief Read any TMC register by address
+ *
+ * Bring-up escape hatch. GSTAT (0x01) in particular carries uv_cp, the
+ * charge-pump undervoltage flag, which is the difference between "the motor is
+ * too weak" and "the motor has no usable supply".
+ */
+int tmc51xx_stepper_ctrl_read_reg(const struct device *dev, uint8_t reg, uint32_t *value);
+
+/** @brief Read CHOPCONF - TOFF in bits 3:0 is zero when the chopper is off. */
+int tmc51xx_stepper_ctrl_read_chopconf(const struct device *dev, uint32_t *chopconf);
+
+/**
  * @brief Write the full six-point ramp, converting from real units
  *
  * Conversion needs fCLK, which only the driver knows, so it happens here

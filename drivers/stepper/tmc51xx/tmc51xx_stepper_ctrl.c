@@ -109,6 +109,20 @@ int tmc51xx_stepper_ctrl_set_soft_ramp(const struct device *dev,
 		.d1 = tmc5xxx_calculate_acceleration_from_hz_to_fclk(ramp->d1, fclk),
 		.dmax = tmc5xxx_calculate_acceleration_from_hz_to_fclk(ramp->dmax, fclk),
 		.tzerowait = ramp->tzerowait,
+		/*
+		 * Carry the devicetree currents through untouched.
+		 *
+		 * set_ramp() writes IHOLD_IRUN unconditionally, so a
+		 * zero-initialised field here does not mean "leave it alone" -
+		 * it means IRUN = 0. On the TMC5130 that is current scale 0,
+		 * which is 1/32 of full scale rather than off, so the motor
+		 * still turns: it just loses ~97% of its torque the first time
+		 * the app changes the ramp. That reads as a mechanical fault -
+		 * fine on a level rail unloaded, no chance against gravity.
+		 * Speed and acceleration are this call's business; current is
+		 * not, so it keeps whatever the board configured.
+		 */
+		.iholdrun = config->default_ramp_config.iholdrun,
 	};
 
 	/* VSTOP must be at least 1 or the ramp generator never finishes a
@@ -124,6 +138,49 @@ int tmc51xx_stepper_ctrl_set_soft_ramp(const struct device *dev,
 	}
 
 	return tmc51xx_stepper_ctrl_set_ramp(dev, &fixed);
+}
+
+int tmc51xx_stepper_ctrl_read_reg(const struct device *dev, uint8_t reg, uint32_t *value)
+{
+	const struct tmc51xx_stepper_ctrl_config *config = dev->config;
+
+	__ASSERT(value != NULL, "value pointer must not be NULL");
+
+	if (tmc51xx_read(config->controller, reg, value) != 0) {
+		LOG_ERR("%s: failed to read register 0x%02x", dev->name, reg);
+		return -EIO;
+	}
+	return 0;
+}
+
+int tmc51xx_stepper_ctrl_read_drv_status(const struct device *dev, uint32_t *drv_status)
+{
+	const struct tmc51xx_stepper_ctrl_config *config = dev->config;
+	int err;
+
+	__ASSERT(drv_status != NULL, "drv_status pointer must not be NULL");
+
+	err = tmc51xx_read(config->controller, TMC51XX_DRVSTATUS, drv_status);
+	if (err != 0) {
+		LOG_ERR("%s: Failed to read DRVSTATUS register", dev->name);
+		return -EIO;
+	}
+	return 0;
+}
+
+int tmc51xx_stepper_ctrl_read_chopconf(const struct device *dev, uint32_t *chopconf)
+{
+	const struct tmc51xx_stepper_ctrl_config *config = dev->config;
+	int err;
+
+	__ASSERT(chopconf != NULL, "chopconf pointer must not be NULL");
+
+	err = tmc51xx_read(config->controller, TMC51XX_CHOPCONF, chopconf);
+	if (err != 0) {
+		LOG_ERR("%s: Failed to read CHOPCONF register", dev->name);
+		return -EIO;
+	}
+	return 0;
 }
 
 int tmc51xx_stepper_ctrl_read_ramp_stat(const struct device *dev, uint32_t *ramp_stat)
