@@ -9,6 +9,7 @@
 
 #include <zephyr/drivers/stepper/stepper_ctrl.h>
 #include "tmc51xx.h"
+#include <zephyr/stepper/cb_tmc51xx.h>
 #include <adi_tmc5xxx_common.h>
 
 #include <zephyr/logging/log.h>
@@ -87,6 +88,42 @@ int tmc51xx_stepper_ctrl_set_max_velocity(const struct device *dev, uint32_t vel
 		return -EIO;
 	}
 	return 0;
+}
+
+int tmc51xx_stepper_ctrl_set_ramp(const struct device *dev,
+				  const struct tmc_ramp_generator_data *ramp_data);
+
+int tmc51xx_stepper_ctrl_set_soft_ramp(const struct device *dev,
+				       const struct tmc51xx_soft_ramp *ramp)
+{
+	const struct tmc51xx_stepper_ctrl_config *config = dev->config;
+	const struct device *controller = config->controller;
+	const uint32_t fclk = tmc51xx_get_clock_frequency(controller);
+	const struct tmc_ramp_generator_data data = {
+		.vstart = tmc5xxx_calculate_velocity_from_hz_to_fclk(ramp->vstart, fclk),
+		.v1 = tmc5xxx_calculate_velocity_from_hz_to_fclk(ramp->v1, fclk),
+		.vmax = tmc5xxx_calculate_velocity_from_hz_to_fclk(ramp->vmax, fclk),
+		.vstop = tmc5xxx_calculate_velocity_from_hz_to_fclk(ramp->vstop, fclk),
+		.a1 = tmc5xxx_calculate_acceleration_from_hz_to_fclk(ramp->a1, fclk),
+		.amax = tmc5xxx_calculate_acceleration_from_hz_to_fclk(ramp->amax, fclk),
+		.d1 = tmc5xxx_calculate_acceleration_from_hz_to_fclk(ramp->d1, fclk),
+		.dmax = tmc5xxx_calculate_acceleration_from_hz_to_fclk(ramp->dmax, fclk),
+		.tzerowait = ramp->tzerowait,
+	};
+
+	/* VSTOP must be at least 1 or the ramp generator never finishes a
+	 * positioning move.
+	 */
+	struct tmc_ramp_generator_data fixed = data;
+
+	if (fixed.vstop < TMC_RAMP_VSTOP_MIN) {
+		fixed.vstop = TMC_RAMP_VSTOP_MIN;
+	}
+	if (fixed.d1 < TMC_RAMP_D1_MIN) {
+		fixed.d1 = TMC_RAMP_D1_MIN;
+	}
+
+	return tmc51xx_stepper_ctrl_set_ramp(dev, &fixed);
 }
 
 int tmc51xx_stepper_ctrl_read_ramp_stat(const struct device *dev, uint32_t *ramp_stat)
