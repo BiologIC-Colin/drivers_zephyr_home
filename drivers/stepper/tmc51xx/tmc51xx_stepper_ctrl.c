@@ -151,13 +151,14 @@ int tmc51xx_stepper_ctrl_set_soft_ramp(const struct device *dev,
 }
 
 int tmc51xx_stepper_ctrl_set_limits(const struct device *dev, uint32_t vmax_hz,
-				    uint32_t amax_hz2)
+				    uint32_t amax_hz2, uint32_t dmax_hz2)
 {
 	const struct tmc51xx_stepper_ctrl_config *config = dev->config;
 	const struct device *controller = config->controller;
 	const uint32_t fclk = tmc51xx_get_clock_frequency(controller);
 	uint32_t v = tmc5xxx_calculate_velocity_from_hz_to_fclk(vmax_hz, fclk);
 	uint32_t a = tmc5xxx_calculate_acceleration_from_hz_to_fclk(amax_hz2, fclk);
+	uint32_t d = tmc5xxx_calculate_acceleration_from_hz_to_fclk(dmax_hz2, fclk);
 	int err;
 
 	/* AMAX of zero stalls the ramp generator outright: it can never reach
@@ -168,10 +169,17 @@ int tmc51xx_stepper_ctrl_set_limits(const struct device *dev, uint32_t vmax_hz,
 	if (a == 0) {
 		a = 1;
 	}
+	/* DMAX of zero is far worse than useless - it is the one that lets a
+	 * move run off the end of the rail, because the generator cannot slow
+	 * down to stop at XTARGET. Never let a caller ask for it.
+	 */
+	if (d == 0) {
+		d = 1;
+	}
 
 	err = tmc51xx_write(controller, TMC51XX_AMAX, a);
 	if (err == 0) {
-		err = tmc51xx_write(controller, TMC51XX_DMAX, a);
+		err = tmc51xx_write(controller, TMC51XX_DMAX, d);
 	}
 	if (err == 0) {
 		err = tmc51xx_write(controller, TMC51XX_VMAX, v);

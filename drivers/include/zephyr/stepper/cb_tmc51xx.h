@@ -92,13 +92,22 @@ int tmc51xx_stepper_ctrl_read_reg(const struct device *dev, uint8_t reg, uint32_
  * writes three, and leaves the chopper and current configuration that the
  * rest of the ramp struct carries untouched.
  *
- * vmax and amax are in Hz and Hz/s - microsteps per second, and per second
- * squared. The conversion to the chip's internal clock units happens here.
- * amax is applied to AMAX and DMAX alike, so the curve's own deceleration
- * shape governs rather than a separately configured decel.
+ * vmax, amax and dmax are in Hz and Hz/s - microsteps per second, and per
+ * second squared. The conversion to the chip's internal clock units happens
+ * here.
+ *
+ * AMAX and DMAX are deliberately separate. They were originally set from one
+ * value taken from the curve's instantaneous acceleration, which is a trap:
+ * wherever a curve runs at constant velocity its acceleration is zero, so
+ * DMAX went to zero with it and the ramp generator lost the ability to
+ * decelerate at all. It could then never stop at XTARGET. At the AMAX LSB of
+ * fCLK^2/2^41 (about 79 usteps/s^2, 0.093 mm/s^2 on this machine) the
+ * stopping distance from a mere 20 mm/s is over two metres - twice the rail.
+ * Observed on the bench: a move with a long constant-velocity tail drove into
+ * the end stop with 9 s still on the clock.
  */
 int tmc51xx_stepper_ctrl_set_limits(const struct device *dev, uint32_t vmax_hz,
-				    uint32_t amax_hz2);
+				    uint32_t amax_hz2, uint32_t dmax_hz2);
 
 /* Absolute target for the ramp generator, without touching the ramp shape.
  * Selects positioning mode as a side effect, exactly as move_to does.
