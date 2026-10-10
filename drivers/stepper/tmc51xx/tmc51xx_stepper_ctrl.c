@@ -99,45 +99,55 @@ int tmc51xx_stepper_ctrl_set_soft_ramp(const struct device *dev,
 	const struct tmc51xx_stepper_ctrl_config *config = dev->config;
 	const struct device *controller = config->controller;
 	const uint32_t fclk = tmc51xx_get_clock_frequency(controller);
-	const struct tmc_ramp_generator_data data = {
-		.vstart = tmc5xxx_calculate_velocity_from_hz_to_fclk(ramp->vstart, fclk),
-		.v1 = tmc5xxx_calculate_velocity_from_hz_to_fclk(ramp->v1, fclk),
-		.vmax = tmc5xxx_calculate_velocity_from_hz_to_fclk(ramp->vmax, fclk),
-		.vstop = tmc5xxx_calculate_velocity_from_hz_to_fclk(ramp->vstop, fclk),
-		.a1 = tmc5xxx_calculate_acceleration_from_hz_to_fclk(ramp->a1, fclk),
-		.amax = tmc5xxx_calculate_acceleration_from_hz_to_fclk(ramp->amax, fclk),
-		.d1 = tmc5xxx_calculate_acceleration_from_hz_to_fclk(ramp->d1, fclk),
-		.dmax = tmc5xxx_calculate_acceleration_from_hz_to_fclk(ramp->dmax, fclk),
-		.tzerowait = ramp->tzerowait,
-		/*
-		 * Carry the devicetree currents through untouched.
-		 *
-		 * set_ramp() writes IHOLD_IRUN unconditionally, so a
-		 * zero-initialised field here does not mean "leave it alone" -
-		 * it means IRUN = 0. On the TMC5130 that is current scale 0,
-		 * which is 1/32 of full scale rather than off, so the motor
-		 * still turns: it just loses ~97% of its torque the first time
-		 * the app changes the ramp. That reads as a mechanical fault -
-		 * fine on a level rail unloaded, no chance against gravity.
-		 * Speed and acceleration are this call's business; current is
-		 * not, so it keeps whatever the board configured.
-		 */
-		.iholdrun = config->default_ramp_config.iholdrun,
-	};
+	/*
+	 * Start from the board's own ramp and overwrite only the fields this
+	 * call actually owns.
+	 *
+	 * set_ramp() writes EVERY field of this struct to silicon, so building
+	 * a fresh one with a designated initialiser does not mean "leave the
+	 * rest alone" - it means "set the rest to zero". That cost us three
+	 * registers before anyone noticed:
+	 *
+	 *   IHOLD_IRUN  -> IRUN 0. On a TMC5130 current scale 0 is 1/32 of full
+	 *                  scale, not off, so the motor kept turning at roughly
+	 *                  3% torque and presented as a mechanical fault.
+	 *   TPWMTHRS    -> 0. With en_pwm_mode set, TSTEP >= TPWMTHRS at every
+	 *                  velocity, so stealthChop never hands over to
+	 *                  spreadCycle and the carriage stalls at speed under
+	 *                  load - the exact failure the board's tpwmthrs = 155
+	 *                  was chosen to prevent.
+	 *   TPOWER_DOWN -> 0, collapsing to the hold current the instant
+	 *                  standstill is flagged rather than ~199 ms later.
+	 *
+	 * All three were invisible at boot, because init writes the complete
+	 * devicetree config; they only appeared on the first ramp change, which
+	 * is why a reboot looked like a fix. Copying the board config first
+	 * means any field added to this struct in future defaults to what the
+	 * board asked for rather than silently to zero.
+	 */
+	struct tmc_ramp_generator_data data = config->default_ramp_config;
+
+	data.vstart = tmc5xxx_calculate_velocity_from_hz_to_fclk(ramp->vstart, fclk);
+	data.v1 = tmc5xxx_calculate_velocity_from_hz_to_fclk(ramp->v1, fclk);
+	data.vmax = tmc5xxx_calculate_velocity_from_hz_to_fclk(ramp->vmax, fclk);
+	data.vstop = tmc5xxx_calculate_velocity_from_hz_to_fclk(ramp->vstop, fclk);
+	data.a1 = tmc5xxx_calculate_acceleration_from_hz_to_fclk(ramp->a1, fclk);
+	data.amax = tmc5xxx_calculate_acceleration_from_hz_to_fclk(ramp->amax, fclk);
+	data.d1 = tmc5xxx_calculate_acceleration_from_hz_to_fclk(ramp->d1, fclk);
+	data.dmax = tmc5xxx_calculate_acceleration_from_hz_to_fclk(ramp->dmax, fclk);
+	data.tzerowait = ramp->tzerowait;
 
 	/* VSTOP must be at least 1 or the ramp generator never finishes a
 	 * positioning move.
 	 */
-	struct tmc_ramp_generator_data fixed = data;
-
-	if (fixed.vstop < TMC_RAMP_VSTOP_MIN) {
-		fixed.vstop = TMC_RAMP_VSTOP_MIN;
+	if (data.vstop < TMC_RAMP_VSTOP_MIN) {
+		data.vstop = TMC_RAMP_VSTOP_MIN;
 	}
-	if (fixed.d1 < TMC_RAMP_D1_MIN) {
-		fixed.d1 = TMC_RAMP_D1_MIN;
+	if (data.d1 < TMC_RAMP_D1_MIN) {
+		data.d1 = TMC_RAMP_D1_MIN;
 	}
 
-	return tmc51xx_stepper_ctrl_set_ramp(dev, &fixed);
+	return tmc51xx_stepper_ctrl_set_ramp(dev, &data);
 }
 
 int tmc51xx_stepper_ctrl_read_reg(const struct device *dev, uint8_t reg, uint32_t *value)
