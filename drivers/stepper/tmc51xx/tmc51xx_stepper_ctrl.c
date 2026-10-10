@@ -150,6 +150,55 @@ int tmc51xx_stepper_ctrl_set_soft_ramp(const struct device *dev,
 	return tmc51xx_stepper_ctrl_set_ramp(dev, &data);
 }
 
+int tmc51xx_stepper_ctrl_set_limits(const struct device *dev, uint32_t vmax_hz,
+				    uint32_t amax_hz2)
+{
+	const struct tmc51xx_stepper_ctrl_config *config = dev->config;
+	const struct device *controller = config->controller;
+	const uint32_t fclk = tmc51xx_get_clock_frequency(controller);
+	uint32_t v = tmc5xxx_calculate_velocity_from_hz_to_fclk(vmax_hz, fclk);
+	uint32_t a = tmc5xxx_calculate_acceleration_from_hz_to_fclk(amax_hz2, fclk);
+	int err;
+
+	/* AMAX of zero stalls the ramp generator outright: it can never reach
+	 * any new velocity, so the carriage simply stops responding to further
+	 * commands. A curve legitimately passes through zero acceleration at
+	 * an inflection point, so clamp rather than reject.
+	 */
+	if (a == 0) {
+		a = 1;
+	}
+
+	err = tmc51xx_write(controller, TMC51XX_AMAX, a);
+	if (err == 0) {
+		err = tmc51xx_write(controller, TMC51XX_DMAX, a);
+	}
+	if (err == 0) {
+		err = tmc51xx_write(controller, TMC51XX_VMAX, v);
+	}
+	if (err != 0) {
+		LOG_ERR("%s: failed to set limits (%d)", dev->name, err);
+	}
+	return err;
+}
+
+int tmc51xx_stepper_ctrl_set_target(const struct device *dev, int32_t position)
+{
+	const struct tmc51xx_stepper_ctrl_config *config = dev->config;
+	const struct device *controller = config->controller;
+	int err;
+
+	err = tmc51xx_write(controller, TMC51XX_RAMPMODE,
+			    TMC5XXX_RAMPMODE_POSITIONING_MODE);
+	if (err == 0) {
+		err = tmc51xx_write(controller, TMC51XX_XTARGET, position);
+	}
+	if (err != 0) {
+		LOG_ERR("%s: failed to set target (%d)", dev->name, err);
+	}
+	return err;
+}
+
 int tmc51xx_stepper_ctrl_read_reg(const struct device *dev, uint8_t reg, uint32_t *value)
 {
 	const struct tmc51xx_stepper_ctrl_config *config = dev->config;

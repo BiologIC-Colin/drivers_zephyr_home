@@ -81,6 +81,30 @@ int tmc51xx_stepper_ctrl_read_drv_status(const struct device *dev, uint32_t *drv
  */
 int tmc51xx_stepper_ctrl_read_reg(const struct device *dev, uint8_t reg, uint32_t *value);
 
+/*
+ * Set only the velocity and acceleration limits, leaving every other ramp
+ * register alone, and point the ramp generator at an absolute target.
+ *
+ * CB-FORK ADDITION. The cue engine re-shapes the ramp at 100 Hz while a move
+ * is running, which is what lets a chip whose ramp generator only knows
+ * trapezoids follow an arbitrary curve. Going through set_soft_ramp() for
+ * that would write thirteen registers per tick when two of them change; this
+ * writes three, and leaves the chopper and current configuration that the
+ * rest of the ramp struct carries untouched.
+ *
+ * vmax and amax are in Hz and Hz/s - microsteps per second, and per second
+ * squared. The conversion to the chip's internal clock units happens here.
+ * amax is applied to AMAX and DMAX alike, so the curve's own deceleration
+ * shape governs rather than a separately configured decel.
+ */
+int tmc51xx_stepper_ctrl_set_limits(const struct device *dev, uint32_t vmax_hz,
+				    uint32_t amax_hz2);
+
+/* Absolute target for the ramp generator, without touching the ramp shape.
+ * Selects positioning mode as a side effect, exactly as move_to does.
+ */
+int tmc51xx_stepper_ctrl_set_target(const struct device *dev, int32_t position);
+
 /** @brief Read CHOPCONF - TOFF in bits 3:0 is zero when the chopper is off. */
 int tmc51xx_stepper_ctrl_read_chopconf(const struct device *dev, uint32_t *chopconf);
 
